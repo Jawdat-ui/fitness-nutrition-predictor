@@ -785,26 +785,38 @@ elif page == "🤖 AI Coach":
 
         # Call Gemini
         with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner("Thinking..."):
+            with st.spinner("💭 Thinking..."):
                 try:
                     from google import genai
+                    from google.genai import types
+
                     client = genai.Client(api_key=api_key)
 
-                    # Build conversation history
-                    contents = [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + st.session_state.messages[0]["content"]}]}]
-                    if len(st.session_state.messages) > 1:
-                        contents = [{"role": "user", "parts": [{"text": system_prompt}]}]
-                        for msg in st.session_state.messages:
-                            role = "user" if msg["role"] == "user" else "model"
-                            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+                    # Build simple prompt with context + conversation
+                    chat_history = ""
+                    for msg in st.session_state.messages[:-1]:  # exclude current
+                        role = "User" if msg["role"] == "user" else "Coach"
+                        chat_history += f"{role}: {msg['content']}\n\n"
+
+                    full_prompt = (
+                        f"{system_prompt}\n\n"
+                        f"{chat_history}"
+                        f"User: {user_input}\n\n"
+                        f"Coach:"
+                    )
 
                     response = client.models.generate_content(
-                        model="gemini-3.7-flash",
-                        contents=contents,
+                        model="gemini-3.5-flash-lite",
+                        contents=full_prompt,
+                        config=types.GenerateContentConfig(
+                            max_output_tokens=1024,
+                            temperature=0.7,
+                        ),
                     )
-                    reply = response.text
+                    reply = response.text or "I didn't get a response. Try asking again!"
                 except Exception as e:
-                    reply = f"⚠️ Error connecting to AI: {str(e)}\n\nMake sure your API key is valid."
+                    reply = f"⚠️ Error: {str(e)}\n\nMake sure your API key is valid."
 
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
+
